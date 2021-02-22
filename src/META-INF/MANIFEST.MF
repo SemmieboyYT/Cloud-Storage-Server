@@ -1,0 +1,2 @@
+Main-Class: semmieboy_yt.cloud_storage_server.Main
+Manifest-Version: 1
