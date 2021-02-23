@@ -28,6 +28,6 @@ public class Logger {
                 text = "[CRITICAL] "+text;
                 break;
         }
-        System.out.println("["+java.time.LocalTime.now()+"] "+text);
+        System.out.println("["+Main.timeFormat.format(java.time.LocalTime.now())+"] "+text);
     }
 }
