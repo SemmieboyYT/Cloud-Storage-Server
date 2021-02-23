@@ -60,6 +60,7 @@ public class Main {
                             int parseInt = Integer.parseInt(value);
                             if (parseInt >= 1 && parseInt <= 65535) {
                                 port = parseInt;
+                                break;
                             }
                         }
                         Logger.log(Logger.level.WARNING, "Value for \"port\" is not a valid port, skipping.");
