@@ -30,6 +30,12 @@ public class WebServer {
         httpServer.setExecutor(threadPoolExecutor);
         httpServer.start();
         Logger.log(Logger.level.NORMAL, "Server has started on port "+port);
+        Logger.log(Logger.level.NORMAL, "Type \"help\" or \"?\" for help");
+        new CommandProcessor(System.in).start();
+    }
+
+    public void stop() {
+        httpServer.stop(0);
     }
 }
 
@@ -65,13 +71,18 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                     } else if (requestPath.startsWith("/file")) {
                         File requestedFile = new File(Main.workDir.getPath()+requestPath.substring(5).replace("/", File.separator));
 
-                        if (requestedFile.exists()) {
+                        if (requestedFile.isFile()) {
                             sendBytes(httpExchange, Files.readAllBytes(requestedFile.toPath()), 200);
                         } else {
                             sendBytes(httpExchange, "<!doctype html><html><head><title>404 not found</title></head><body><h1>Error 404: File not found</h1></body></html>".getBytes(), 404);
                         }
                     } else if (requestPath.equalsIgnoreCase("/favicon.ico")) {
-                        sendBytes(httpExchange, Files.readAllBytes(Paths.get(Main.workDir.toPath()+File.separator+"favicon.ico")), 200);
+                        File favicon = new File(Main.workDir.getPath()+File.separator+"/favicon.ico");
+                        if (favicon.exists()) {
+                            sendBytes(httpExchange, Files.readAllBytes(Paths.get(Main.workDir.toPath()+File.separator+"favicon.ico")), 200);
+                        } else {
+                            sendBytes(httpExchange, "Not found".getBytes(), 404);
+                        }
                     } else {
                         sendBytes(httpExchange, HtmlFormat.format(mainSite).getBytes(), 200);
                     }

@@ -11,12 +11,14 @@ public class Main {
     public static File workDir = new File(".");
     public static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("dd-MM-yyyy");
     public static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
+    public static final String lineSep = System.lineSeparator();
+    public static WebServer webServer;
 
     public static void main(String[] arguments) {
         int port = 80;
         boolean force = false;
 
-        if (arguments.length > 1) {
+        if (arguments.length > 0) {
             List<String> args = new ArrayList<>();
             int length = arguments.length;
 
@@ -73,6 +75,7 @@ public class Main {
             System.exit(1);
         }
 
-        new WebServer(port);
+        Runtime.getRuntime().addShutdownHook(new ShutdownHook());
+        webServer = new WebServer(port);
     }
 }
