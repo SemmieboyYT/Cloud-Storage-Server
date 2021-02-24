@@ -3,13 +3,15 @@ package semmieboy_yt.cloud_storage_server;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
+import javax.xml.bind.DatatypeConverter;
+import javax.xml.crypto.Data;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -62,29 +64,39 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                 }
                 break;
             case "GET":
-                String mainSite = "<!doctype html><html><head><title>Cloud Storage</title></head><body><h1>"+requestURI+" %date% %time%</h1></body></html>";
-                try {
-                    String requestPath = requestURI.getPath();
-                    if (requestPath.startsWith("/google")) {
-                        httpExchange.getResponseHeaders().add("Location", "https://www.google.com");
-                        sendBytes(httpExchange, "Redirecting to www.google.com".getBytes(), 302);
-                    } else if (requestPath.startsWith("/file")) {
-                        File requestedFile = new File(Main.workDir.getPath()+requestPath.substring(5).replace("/", File.separator));
+                String requestPath = requestURI.getPath();
+                String[] args = requestPath.substring(1).split("/");
 
-                        if (requestedFile.isFile()) {
-                            sendBytes(httpExchange, Files.readAllBytes(requestedFile.toPath()), 200);
-                        } else {
-                            sendBytes(httpExchange, "<!doctype html><html><head><title>404 not found</title></head><body><h1>Error 404: File not found</h1></body></html>".getBytes(), 404);
-                        }
-                    } else if (requestPath.equalsIgnoreCase("/favicon.ico")) {
-                        File favicon = new File(Main.workDir.getPath()+File.separator+"/favicon.ico");
-                        if (favicon.exists()) {
-                            sendBytes(httpExchange, Files.readAllBytes(Paths.get(Main.workDir.toPath()+File.separator+"favicon.ico")), 200);
-                        } else {
-                            sendBytes(httpExchange, "Not found".getBytes(), 404);
-                        }
-                    } else {
-                        sendBytes(httpExchange, HtmlFormat.format(mainSite).getBytes(), 200);
+                try {
+                    switch (args[0]) {
+                        default:
+                            sendBytes(httpExchange, HtmlFormat.format("<!doctype html><html><head><title>Cloud Storage</title></head><body><h1>"+requestURI+" %date% %time%</h1></body></html>").getBytes(), 200);
+                            break;
+                        case "favicon":
+                            File favicon = new File(Main.workDir.getPath()+File.separator+"/favicon.ico");
+                            if (favicon.exists()) {
+                                sendBytes(httpExchange, Files.readAllBytes(Paths.get(Main.workDir.toPath()+File.separator+"favicon.ico")), 200);
+                            } else {
+                                sendBytes(httpExchange, "Not found".getBytes(), 404);
+                            }
+                            break;
+                        case "site":
+                            if (args.length > 1) {
+                                httpExchange.getResponseHeaders().add("Location", args[1]);
+                                sendBytes(httpExchange, ("Redirecting to "+args[1]).getBytes(), 302);
+                            } else {
+                                sendBytes(httpExchange, "Please enter a site, example: /site/google.com".getBytes(), 200);
+                            }
+                            break;
+                        case "file":
+                            File requestedFile = new File(Main.workDir.getPath()+File.separator+requestPath.replace("/"+args[0], ""));
+
+                            if (requestedFile.isFile()) {
+                                sendFile(httpExchange, requestedFile, 200);
+                            } else {
+                                sendBytes(httpExchange, "<!doctype html><html><head><title>404 not found</title></head><body><h1>Error 404: File not found</h1></body></html>".getBytes(), 404);
+                            }
+                            break;
                     }
                 } catch (IOException exception) {
                     exception.printStackTrace();
@@ -99,11 +111,56 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
         }
     }
 
-    private void sendBytes(HttpExchange httpExchange, byte[] bytes, int code) throws IOException {
+    private void sendBytes(HttpExchange httpExchange, byte[] bytes, int status) throws IOException {
         OutputStream outputStream = httpExchange.getResponseBody();
-        httpExchange.sendResponseHeaders(code, bytes.length);
+        httpExchange.sendResponseHeaders(status, bytes.length);
         outputStream.write(bytes);
-        outputStream.flush();
         outputStream.close();
+    }
+
+    private void sendFile(HttpExchange httpExchange, File file, int status) throws IOException {
+        long length = file.length();
+        OutputStream outputStream = httpExchange.getResponseBody();
+
+        if (length > 1024) {
+            int offset = 0;
+            InputStream fileInputStream = new FileInputStream(file);
+
+            httpExchange.getResponseHeaders().add("Transfer-Encoding", "chunked");
+            httpExchange.sendResponseHeaders(status, length);
+            int i = 0;
+
+            while (offset < length) {
+                i++;
+                Logger.log(Logger.level.DEBUG, "At chunk "+i+" "+length);
+                byte[] bytes = new byte[1024];
+
+                ByteBuffer byteBuffer1 = ByteBuffer.wrap(Integer.toHexString(bytes.length).getBytes());
+                byteBuffer1.put(new byte[] {13, 10});
+                byteBuffer1.put(bytes);
+                byteBuffer1.put(new byte[] {13, 10});
+
+                Logger.log(Logger.level.DEBUG, new String(byteBuffer1.array()));
+
+                int result = fileInputStream.read(bytes, offset, bytes.length+offset);
+                if (result == -1) break;
+
+                ByteBuffer byteBuffer = ByteBuffer.wrap(Integer.toHexString(bytes.length).getBytes());
+                byteBuffer.put(new byte[] {13, 10});
+                byteBuffer.put(bytes);
+                byteBuffer.put(new byte[] {13, 10});
+
+                Logger.log(Logger.level.DEBUG, new String(byteBuffer.array()));
+
+                outputStream.write(byteBuffer.array());
+                offset += result;
+            }
+            Logger.log(Logger.level.DEBUG, "Sending terminator chunk");
+            //Terminator chunk (0\r\n\r\n)
+            outputStream.write(new byte[] {48, 13, 10, 13, 10});
+        } else {
+            httpExchange.sendResponseHeaders(status, length);
+            outputStream.write(Files.readAllBytes(file.toPath()));
+        }
     }
 }
