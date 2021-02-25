@@ -4,7 +4,7 @@ import java.io.InputStream;
 import java.util.Scanner;
 
 public class CommandProcessor {
-    private Scanner scanner;
+    private final Scanner scanner;
     public boolean active = false;
 
     public CommandProcessor(InputStream inputStream) {
@@ -19,7 +19,6 @@ public class CommandProcessor {
     private void read() {
         new Thread(() -> {
             if (active) {
-                System.out.print("> ");
                 String[] args = scanner.nextLine().split(" ");
                 switch (args[0]) {
                     default:
@@ -27,11 +26,36 @@ public class CommandProcessor {
                         break;
                     case "help":
                     case "?":
-                        Logger.log(Logger.level.NORMAL, "help:   Show a list of possible commands");
-                        Logger.log(Logger.level.NORMAL, "?:      Show a list of possible commands");
-                        Logger.log(Logger.level.NORMAL, "stop:   Stop the server");
+                        Logger.log(Logger.level.NORMAL, "help:       Show a list of possible commands");
+                        Logger.log(Logger.level.NORMAL, "?:          Show a list of possible commands");
+                        Logger.log(Logger.level.NORMAL, "stop:       Stop the server");
+                        Logger.log(Logger.level.NORMAL, "start:      Start the server");
+                        Logger.log(Logger.level.NORMAL, "exit:       Exit the program");
+                        Logger.log(Logger.level.NORMAL, "lockdown:   Stops all HTTP requests from processing, toggles");
                         break;
                     case "stop":
+                        if (Main.webServer.running) {
+                            Main.webServer.stop();
+                            if (!Main.webServer.running) {
+                                Logger.log(Logger.level.NORMAL, "Server stopped");
+                            }
+                        } else {
+                            Logger.log(Logger.level.ERROR, "Server already stopped");
+                        }
+                        break;
+                    case "start":
+                        if (Main.webServer.running) {
+                            Logger.log(Logger.level.ERROR, "Server already started");
+                        } else {
+                            Main.webServer.start();
+                            if (Main.webServer.running) Logger.log(Logger.level.NORMAL, "Server has started");
+                        }
+                        break;
+                    case "lockdown":
+                        Main.webServer.lockdown = !Main.webServer.lockdown;
+                        Logger.log(Logger.level.NORMAL, "Set lockdown mode to "+Main.webServer.lockdown);
+                        break;
+                    case "exit":
                         System.exit(0);
                         break;
                 }

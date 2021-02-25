@@ -1,7 +1,6 @@
 package semmieboy_yt.cloud_storage_server;
 
 import javax.swing.*;
-import javax.xml.bind.DatatypeConverter;
 import java.io.File;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -9,12 +8,12 @@ import java.util.Arrays;
 import java.util.List;
 
 public class Main {
-    public static boolean isDebug = false;
+    public static boolean debug = false;
     public static File workDir = new File(".");
     public static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("dd-MM-yyyy");
     public static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
-    public static final String lineSep = System.lineSeparator();
     public static WebServer webServer;
+    public static CommandProcessor commandProcessor = new CommandProcessor(System.in);
 
     public static void main(String[] arguments) {
         int port = 80;
@@ -27,7 +26,7 @@ public class Main {
             for (String arg:arguments) args.add(arg.replaceAll("-", ""));
 
             if (args.contains("debug")) {
-                isDebug = true;
+                debug = true;
                 length--;
                 args.remove("debug");
             }
@@ -79,5 +78,10 @@ public class Main {
 
         Runtime.getRuntime().addShutdownHook(new ShutdownHook());
         webServer = new WebServer(port);
+        if (webServer.running) {
+            Logger.log(Logger.level.NORMAL, "Server has started on port "+port);
+        }
+        commandProcessor.start();
+        Logger.log(Logger.level.NORMAL, "Type \"help\" or \"?\" for help");
     }
 }

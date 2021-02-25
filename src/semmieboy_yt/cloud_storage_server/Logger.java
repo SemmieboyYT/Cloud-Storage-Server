@@ -15,22 +15,23 @@ public class Logger {
     public static void log(level level, String text) {
         switch (level) {
             case DEBUG:
-                if (Main.isDebug) {
-                    text = Ansi.colorize("[Debug] "+text, Attribute.ITALIC(), Attribute.DIM());
+                if (Main.debug) {
+                    System.out.println("\r["+Main.timeFormat.format(java.time.LocalTime.now())+"] "+Ansi.colorize("[Debug] "+text, Attribute.ITALIC(), Attribute.DIM()));
                 } else return;
                 break;
             case NORMAL:
+                System.out.println("\r["+Main.timeFormat.format(java.time.LocalTime.now())+"] "+text);
                 break;
             case WARNING:
-                text = Ansi.colorize("[WARNING] "+text, Attribute.YELLOW_TEXT());
+                System.out.println("\r["+Main.timeFormat.format(java.time.LocalTime.now())+"] "+Ansi.colorize("[WARNING] "+text, Attribute.YELLOW_TEXT()));
                 break;
             case ERROR:
-                text = Ansi.colorize("[ERROR] "+text, Attribute.BRIGHT_RED_TEXT());
+                System.err.println("\r["+Main.timeFormat.format(java.time.LocalTime.now())+"] "+Ansi.colorize("[ERROR] "+text, Attribute.BRIGHT_RED_TEXT()));
                 break;
             case CRITICAL:
-                text = Ansi.colorize("[CRITICAL] "+text, Attribute.RED_TEXT());
+                System.err.println("\r["+Main.timeFormat.format(java.time.LocalTime.now())+"] "+Ansi.colorize("[CRITICAL] "+text, Attribute.RED_TEXT()));
                 break;
         }
-        System.out.println("["+Main.timeFormat.format(java.time.LocalTime.now())+"] "+text);
+        if (Main.commandProcessor.active) System.out.print("> ");
     }
 }

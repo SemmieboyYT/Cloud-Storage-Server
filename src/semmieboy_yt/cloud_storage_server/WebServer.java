@@ -3,47 +3,51 @@ package semmieboy_yt.cloud_storage_server;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
-import javax.xml.bind.DatatypeConverter;
-import javax.xml.crypto.Data;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 
 public class WebServer {
-    //TODO: add commands for the server
+    public boolean running = false;
+    public boolean lockdown = false;
+    private HttpServer httpServer;
+    private final int port;
 
-    HttpServer httpServer;
-    ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor)Executors.newFixedThreadPool(10);
     public WebServer(int port) {
+        this.port = port;
+        start();
+    }
+
+    public void start() {
         try {
             httpServer = HttpServer.create(new InetSocketAddress(port), 0);
             //TODO: catch java.net.BindException
         } catch (IOException exception) {
             exception.printStackTrace();
             Logger.log(Logger.level.CRITICAL, "The webserver was unable to be created, aborting.");
+            return;
         }
         httpServer.createContext("/", new HttpHandler());
-        httpServer.setExecutor(threadPoolExecutor);
+        httpServer.setExecutor(Executors.newFixedThreadPool(10));
+
         httpServer.start();
-        Logger.log(Logger.level.NORMAL, "Server has started on port "+port);
-        Logger.log(Logger.level.NORMAL, "Type \"help\" or \"?\" for help");
-        new CommandProcessor(System.in).start();
+        running = true;
     }
 
     public void stop() {
-        httpServer.stop(0);
+        httpServer.stop(Integer.MAX_VALUE);
+        running = false;
     }
 }
 
 class HttpHandler implements com.sun.net.httpserver.HttpHandler {
     @Override
     public void handle(HttpExchange httpExchange) {
+        if (Main.webServer.lockdown) return;
         String requestMethod = httpExchange.getRequestMethod();
         URI requestURI = httpExchange.getRequestURI();
         InetSocketAddress inetSocketAddress = httpExchange.getRemoteAddress();
@@ -92,7 +96,7 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                             File requestedFile = new File(Main.workDir.getPath()+File.separator+requestPath.replace("/"+args[0], ""));
 
                             if (requestedFile.isFile()) {
-                                sendFile(httpExchange, requestedFile, 200);
+                                sendData(httpExchange, new FileInputStream(requestedFile), 200);
                             } else {
                                 sendBytes(httpExchange, "<!doctype html><html><head><title>404 not found</title></head><body><h1>Error 404: File not found</h1></body></html>".getBytes(), 404);
                             }
@@ -118,49 +122,67 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
         outputStream.close();
     }
 
-    private void sendFile(HttpExchange httpExchange, File file, int status) throws IOException {
-        long length = file.length();
+    private void sendData(HttpExchange httpExchange, InputStream inputStream, int status) throws IOException {
+        int length = inputStream.available();
         OutputStream outputStream = httpExchange.getResponseBody();
+        int byteSize = 1024;
+        byte[] size = Integer.toHexString(byteSize).getBytes();
+        byte[] terminator = new byte[] {13, 10};
 
-        if (length > 1024) {
-            int offset = 0;
-            InputStream fileInputStream = new FileInputStream(file);
+        if (length > byteSize) {
+            int read = 0;
+            long bytesSend = (long)Math.ceil(length/(double)byteSize)*(byteSize+4+size.length)+5;
+
+            Logger.log(Logger.level.DEBUG, "Calculated amount of bytes that will get send: "+bytesSend);
 
             httpExchange.getResponseHeaders().add("Transfer-Encoding", "chunked");
-            httpExchange.sendResponseHeaders(status, length);
-            int i = 0;
+            httpExchange.sendResponseHeaders(status, Long.MAX_VALUE);
 
-            while (offset < length) {
-                i++;
-                Logger.log(Logger.level.DEBUG, "At chunk "+i+" "+length);
-                byte[] bytes = new byte[1024];
+            while (read < length) {
+                byte[] bytes = new byte[byteSize];
 
-                ByteBuffer byteBuffer1 = ByteBuffer.wrap(Integer.toHexString(bytes.length).getBytes());
-                byteBuffer1.put(new byte[] {13, 10});
-                byteBuffer1.put(bytes);
-                byteBuffer1.put(new byte[] {13, 10});
-
-                Logger.log(Logger.level.DEBUG, new String(byteBuffer1.array()));
-
-                int result = fileInputStream.read(bytes, offset, bytes.length+offset);
+                int result = 0;
+                while (result < bytes.length) {
+                    result = inputStream.read(bytes, 0, bytes.length);
+                    if (result == -1) break;
+                }
                 if (result == -1) break;
+                if (result != bytes.length) {
+                    Logger.log(Logger.level.ERROR, "Expected "+bytes.length+", got "+result);
+                    return;
+                    //TODO: make the client know why data transfer has cancelled
+                }
 
-                ByteBuffer byteBuffer = ByteBuffer.wrap(Integer.toHexString(bytes.length).getBytes());
-                byteBuffer.put(new byte[] {13, 10});
+                ByteBuffer byteBuffer = ByteBuffer.allocate(size.length + 4 + bytes.length);
+                byteBuffer.put(size);
+                byteBuffer.put(terminator);
                 byteBuffer.put(bytes);
-                byteBuffer.put(new byte[] {13, 10});
+                byteBuffer.put(terminator);
 
-                Logger.log(Logger.level.DEBUG, new String(byteBuffer.array()));
 
+                read += result;
                 outputStream.write(byteBuffer.array());
-                offset += result;
+
+                /*if (length-read-byteSize < byteSize) {
+                    byteSize = length-read;
+                    Logger.log(Logger.level.DEBUG, "set");
+                }*/
             }
+            Logger.log(Logger.level.DEBUG, "Calculation: "+(bytesSend-read));
             Logger.log(Logger.level.DEBUG, "Sending terminator chunk");
             //Terminator chunk (0\r\n\r\n)
             outputStream.write(new byte[] {48, 13, 10, 13, 10});
+            Logger.log(Logger.level.DEBUG, "Done");
         } else {
             httpExchange.sendResponseHeaders(status, length);
-            outputStream.write(Files.readAllBytes(file.toPath()));
+            byte[] bytes = new byte[length];
+            int offset = 0;
+
+            while (offset < length) {
+                int result = inputStream.read(bytes, offset, length);
+                offset += result;
+            }
+            outputStream.write(bytes);
         }
     }
 }
