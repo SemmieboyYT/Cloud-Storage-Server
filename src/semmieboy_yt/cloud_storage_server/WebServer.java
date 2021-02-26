@@ -4,7 +4,6 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.*;
-import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -16,14 +15,12 @@ public class WebServer {
     public boolean running = false;
     public boolean lockdown = false;
     private HttpServer httpServer;
-    private final int port;
 
     public WebServer(int port) {
-        this.port = port;
-        start();
+        start(port);
     }
 
-    public void start() {
+    public void start(int port) {
         try {
             httpServer = HttpServer.create(new InetSocketAddress(port), 0);
         } catch (IOException exception) {
@@ -66,20 +63,25 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
             default:
                 Logger.log(Logger.level.ERROR, "Don't know how to handle "+requestMethod);
                 try {
-                    sendBytes(httpExchange, "Unknow request method".getBytes(), 501);
+                    sendBytes(httpExchange, "Unknown request method".getBytes(), 501);
                 } catch (IOException exception) {
                     exception.printStackTrace();
                     Logger.log(Logger.level.ERROR, "Unable to send response");
                 }
                 break;
             case "GET":
-                String requestPath = requestURI.getPath();
-                String[] args = requestPath.substring(1).split("/");
-
                 try {
+                    String requestPath = requestURI.getPath();
+                    if (!requestPath.endsWith("/")) {
+                        httpExchange.getResponseHeaders().add("Location", requestPath+"/");
+                        sendBytes(httpExchange, "The URL must end with a /, please make a request with it".getBytes(), 302);
+                        return;
+                    }
+                    String[] args = requestPath.substring(1, requestPath.length() - 1).split("/");
+
                     switch (args[0]) {
                         default:
-                            sendBytes(httpExchange, HtmlFormat.format("<!doctype html><html><head><title>Cloud Storage</title></head><body><h1>"+requestURI+" %date% %time%</h1></body></html>").getBytes(), 200);
+                            sendBytes(httpExchange, HtmlFormat.format("<!DOCTYPE html><html><head><title>Cloud Storage</title></head><body><h1>"+requestURI+" %date% %time%</h1></body></html>").getBytes(), 200);
                             break;
                         case "favicon":
                             File favicon = new File(Main.workDir.getPath()+File.separator+"/favicon.ico");
@@ -97,13 +99,27 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                                 sendBytes(httpExchange, "Please enter a site, example: /site/google.com".getBytes(), 200);
                             }
                             break;
-                        case "file":
+                        case "files":
                             File requestedFile = new File(Main.workDir.getPath()+File.separator+requestPath.replace("/"+args[0], ""));
 
                             if (requestedFile.isFile()) {
-                                sendData(httpExchange, new FileInputStream(requestedFile), 200);
+                                FileInputStream fileInputStream = new FileInputStream(requestedFile);
+                                sendData(httpExchange, fileInputStream, 200);
+                                fileInputStream.close();
+                            } else if (requestedFile.isDirectory()) {
+                                String fileName = requestedFile.getName();
+                                StringBuilder response = new StringBuilder("<!DOCTYPE html><html><head><title>Directory listing for "+fileName+"</title></head><body><h1>"+fileName+"</h1><hr>");
+
+                                for (File file:requestedFile.listFiles()) {
+                                    String name = file.getName();
+                                    if (file.isDirectory()) name += "/";
+                                    response.append("<a href=\"").append(name).append("\">").append(name).append("</a><br><br>");
+                                }
+                                response.append("</body></html>");
+
+                                sendBytes(httpExchange, response.toString().getBytes(), 200);
                             } else {
-                                sendBytes(httpExchange, "<!doctype html><html><head><title>404 not found</title></head><body><h1>Error 404: File not found</h1></body></html>".getBytes(), 404);
+                                sendBytes(httpExchange, "<!DOCTYPE html><html><head><title>404 not found</title></head><body><h1>Error 404: File not found</h1></body></html>".getBytes(), 404);
                             }
                             break;
                     }
@@ -125,18 +141,21 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
         httpExchange.sendResponseHeaders(status, bytes.length);
         outputStream.write(bytes);
         outputStream.close();
+        //TODO: use sendData if more then buffer size
     }
 
     private void sendData(HttpExchange httpExchange, InputStream inputStream, int status) throws IOException {
         OutputStream outputStream = httpExchange.getResponseBody();
         int length = inputStream.available();
-        int byteSize = 1024;
+        int bufferSize = Main.bufferSize;
 
-        if (length > byteSize) {
+        if (length > bufferSize) {
             int read = 0;
-            byte[] size = Integer.toHexString(byteSize).getBytes();
+            byte[] size = Integer.toHexString(bufferSize).getBytes();
             byte[] terminator = new byte[] {13, 10};
-            long bytesSend = (long)Math.ceil(length/(double)byteSize)*(byteSize+4+size.length)+5;
+            //TODO: calculate the size more precise
+            long bytesSend = (long)Math.ceil(length/(double)bufferSize)*(bufferSize+4+size.length)+5;
+            ByteBuffer byteBuffer = ByteBuffer.allocate(size.length + 4 + bufferSize);
 
             Logger.log(Logger.level.DEBUG, "Calculated amount of bytes that will get send: "+bytesSend);
 
@@ -146,30 +165,29 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
             int check = 0;
 
             while (read < length) {
-                byte[] bytes = new byte[byteSize];
+                byte[] bytes = new byte[bufferSize];
 
                 int result = 0;
-                while (result < byteSize) {
-                    result = inputStream.read(bytes, 0, byteSize);
+                while (result < bufferSize) {
+                    result = inputStream.read(bytes, 0, bufferSize);
                     if (result == -1) break;
                 }
                 if (result == -1) break;
-                if (result != byteSize) {
-                    Logger.log(Logger.level.ERROR, "Expected "+byteSize+", got "+result);
+                if (result != bufferSize) {
+                    Logger.log(Logger.level.ERROR, "Expected "+bufferSize+", got "+result);
                     return;
                     //TODO: make the client know why data transfer has cancelled
                 }
 
-                ByteBuffer byteBuffer = ByteBuffer.allocate(size.length + 4 + byteSize);
                 byteBuffer.put(size);
                 byteBuffer.put(terminator);
                 byteBuffer.put(bytes);
                 byteBuffer.put(terminator);
 
-
                 read += result;
                 check += byteBuffer.array().length;
                 outputStream.write(byteBuffer.array());
+                byteBuffer.clear();
 
                 /*if (length-read-byteSize < byteSize) {
                     byteSize = length-read;

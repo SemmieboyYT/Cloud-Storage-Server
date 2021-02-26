@@ -26,12 +26,14 @@ public class CommandProcessor {
                         break;
                     case "help":
                     case "?":
-                        Logger.log(Logger.level.NORMAL, "help:       Show a list of possible commands");
-                        Logger.log(Logger.level.NORMAL, "?:          Show a list of possible commands");
-                        Logger.log(Logger.level.NORMAL, "stop:       Stop the server");
-                        Logger.log(Logger.level.NORMAL, "start:      Start the server");
-                        Logger.log(Logger.level.NORMAL, "exit:       Exit the program");
-                        Logger.log(Logger.level.NORMAL, "lockdown:   Stops all HTTP requests from processing, toggles");
+                        Logger.log(Logger.level.NORMAL, "help:         Show a list of possible commands");
+                        Logger.log(Logger.level.NORMAL, "?:            Show a list of possible commands");
+                        Logger.log(Logger.level.NORMAL, "stop:         Stop the server");
+                        Logger.log(Logger.level.NORMAL, "start:        Start the server");
+                        Logger.log(Logger.level.NORMAL, "exit:         Exit the program");
+                        Logger.log(Logger.level.NORMAL, "lockdown:     Stops any new HTTP request from processing, toggles");
+                        Logger.log(Logger.level.NORMAL, "port:         Set the port, will require the server to restart");
+                        Logger.log(Logger.level.NORMAL, "buffersize    Set buffer size in bytes, higher values equal to more speed but more RAM usage");
                         break;
                     case "stop":
                         if (Main.webServer.running) {
@@ -47,7 +49,7 @@ public class CommandProcessor {
                         if (Main.webServer.running) {
                             Logger.log(Logger.level.ERROR, "Server already started");
                         } else {
-                            Main.webServer.start();
+                            Main.webServer.start(Main.port);
                             if (Main.webServer.running) Logger.log(Logger.level.NORMAL, "Server has started");
                         }
                         break;
@@ -57,6 +59,36 @@ public class CommandProcessor {
                         break;
                     case "exit":
                         System.exit(0);
+                        break;
+                    case "port":
+                        if (args.length > 1) {
+                            if (args[1].matches("[0-9]*")) {
+                                int parseInt = Integer.parseInt(args[1]);
+                                if (parseInt >= 1 && parseInt <= 65535) {
+                                    Main.port = parseInt;
+                                    Logger.log(Logger.level.NORMAL, "Set the port to "+parseInt);
+                                    break;
+                                }
+                            }
+                            Logger.log(Logger.level.NORMAL, "That's not a valid port");
+                            break;
+                        }
+                        Logger.log(Logger.level.NORMAL, "The current port is "+Main.port);
+                        break;
+                    case "buffersize":
+                        if (args.length > 1) {
+                            if (args[1].matches("[0-9]*")) {
+                                int parseInt = Integer.parseInt(args[1]);
+                                if (parseInt > 0) {
+                                    Main.bufferSize = parseInt;
+                                    Logger.log(Logger.level.NORMAL, "Set the buffer size to "+parseInt+" bytes");
+                                    break;
+                                }
+                            }
+                            Logger.log(Logger.level.NORMAL, "That's not a valid buffer size");
+                            break;
+                        }
+                        Logger.log(Logger.level.NORMAL, "The current buffer size is "+Main.bufferSize+" bytes");
                         break;
                 }
                 read();

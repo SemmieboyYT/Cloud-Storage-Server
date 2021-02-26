@@ -4,7 +4,6 @@ import javax.swing.*;
 import java.io.File;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class Main {
@@ -14,9 +13,10 @@ public class Main {
     public static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
     public static WebServer webServer;
     public static CommandProcessor commandProcessor = new CommandProcessor(System.in);
+    public static int bufferSize = 10240;
+    public static int port = 80;
 
     public static void main(String[] arguments) {
-        int port = 80;
         boolean force = false;
 
         if (arguments.length > 0) {
@@ -67,6 +67,16 @@ public class Main {
                             }
                         }
                         Logger.log(Logger.level.WARNING, "Value for \"port\" is not a valid port, skipping.");
+                        break;
+                    case "bufferSize":
+                        if (value.matches("[0-9]*")) {
+                            int parseInt = Integer.parseInt(value);
+                            if (parseInt > 0) {
+                                bufferSize = parseInt;
+                                break;
+                            }
+                        }
+                        Logger.log(Logger.level.WARNING, "Value for \"bufferSize\" is invalid, skipping");
                         break;
                 }
             }
