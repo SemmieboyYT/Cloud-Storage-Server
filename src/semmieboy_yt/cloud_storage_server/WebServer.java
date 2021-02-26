@@ -162,8 +162,6 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
             httpExchange.getResponseHeaders().add("Transfer-Encoding", "chunked");
             httpExchange.sendResponseHeaders(status, bytesSend);
 
-            int check = 0;
-
             while (read < length) {
                 byte[] bytes = new byte[bufferSize];
 
@@ -185,7 +183,6 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                 byteBuffer.put(terminator);
 
                 read += result;
-                check += byteBuffer.array().length;
                 outputStream.write(byteBuffer.array());
                 byteBuffer.clear();
 
@@ -198,8 +195,6 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
             //Terminator chunk (0\r\n\r\n)
             outputStream.write(new byte[] {48, 13, 10, 13, 10});
             Logger.log(Logger.level.DEBUG, "Done");
-
-            Logger.log(Logger.level.DEBUG, "Check: "+(bytesSend-(check+5)));
         } else {
             httpExchange.sendResponseHeaders(status, length);
             byte[] bytes = new byte[length];
