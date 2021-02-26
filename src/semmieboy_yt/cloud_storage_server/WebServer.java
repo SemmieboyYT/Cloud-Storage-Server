@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.*;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -27,8 +28,13 @@ public class WebServer {
             httpServer = HttpServer.create(new InetSocketAddress(port), 0);
             //TODO: catch java.net.BindException
         } catch (IOException exception) {
+            Logger.log(Logger.level.DEBUG, exception.getMessage());
+            if (exception.getMessage().equals("Address already in use: bind")) {
+                Logger.log(Logger.level.CRITICAL, "Port "+port+" is already in use");
+                return;
+            }
             exception.printStackTrace();
-            Logger.log(Logger.level.CRITICAL, "The webserver was unable to be created, aborting.");
+            Logger.log(Logger.level.CRITICAL, "The webserver was unable to be created");
             return;
         }
         httpServer.createContext("/", new HttpHandler());
@@ -123,37 +129,39 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
     }
 
     private void sendData(HttpExchange httpExchange, InputStream inputStream, int status) throws IOException {
-        int length = inputStream.available();
         OutputStream outputStream = httpExchange.getResponseBody();
+        int length = inputStream.available();
         int byteSize = 1024;
-        byte[] size = Integer.toHexString(byteSize).getBytes();
-        byte[] terminator = new byte[] {13, 10};
 
         if (length > byteSize) {
             int read = 0;
+            byte[] size = Integer.toHexString(byteSize).getBytes();
+            byte[] terminator = new byte[] {13, 10};
             long bytesSend = (long)Math.ceil(length/(double)byteSize)*(byteSize+4+size.length)+5;
 
             Logger.log(Logger.level.DEBUG, "Calculated amount of bytes that will get send: "+bytesSend);
 
             httpExchange.getResponseHeaders().add("Transfer-Encoding", "chunked");
-            httpExchange.sendResponseHeaders(status, Long.MAX_VALUE);
+            httpExchange.sendResponseHeaders(status, bytesSend);
+
+            int check = 0;
 
             while (read < length) {
                 byte[] bytes = new byte[byteSize];
 
                 int result = 0;
-                while (result < bytes.length) {
-                    result = inputStream.read(bytes, 0, bytes.length);
+                while (result < byteSize) {
+                    result = inputStream.read(bytes, 0, byteSize);
                     if (result == -1) break;
                 }
                 if (result == -1) break;
-                if (result != bytes.length) {
-                    Logger.log(Logger.level.ERROR, "Expected "+bytes.length+", got "+result);
+                if (result != byteSize) {
+                    Logger.log(Logger.level.ERROR, "Expected "+byteSize+", got "+result);
                     return;
                     //TODO: make the client know why data transfer has cancelled
                 }
 
-                ByteBuffer byteBuffer = ByteBuffer.allocate(size.length + 4 + bytes.length);
+                ByteBuffer byteBuffer = ByteBuffer.allocate(size.length + 4 + byteSize);
                 byteBuffer.put(size);
                 byteBuffer.put(terminator);
                 byteBuffer.put(bytes);
@@ -161,6 +169,7 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
 
 
                 read += result;
+                check += byteBuffer.array().length;
                 outputStream.write(byteBuffer.array());
 
                 /*if (length-read-byteSize < byteSize) {
@@ -168,11 +177,12 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                     Logger.log(Logger.level.DEBUG, "set");
                 }*/
             }
-            Logger.log(Logger.level.DEBUG, "Calculation: "+(bytesSend-read));
             Logger.log(Logger.level.DEBUG, "Sending terminator chunk");
             //Terminator chunk (0\r\n\r\n)
             outputStream.write(new byte[] {48, 13, 10, 13, 10});
             Logger.log(Logger.level.DEBUG, "Done");
+
+            Logger.log(Logger.level.DEBUG, "Check: "+(bytesSend-(check+5)));
         } else {
             httpExchange.sendResponseHeaders(status, length);
             byte[] bytes = new byte[length];
