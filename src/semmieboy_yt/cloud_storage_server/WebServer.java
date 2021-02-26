@@ -26,7 +26,6 @@ public class WebServer {
     public void start() {
         try {
             httpServer = HttpServer.create(new InetSocketAddress(port), 0);
-            //TODO: catch java.net.BindException
         } catch (IOException exception) {
             Logger.log(Logger.level.DEBUG, exception.getMessage());
             if (exception.getMessage().equals("Address already in use: bind")) {
