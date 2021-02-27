@@ -1,7 +1,10 @@
 package semmieboy_yt.cloud_storage_server;
 
+import semmieboy_yt.cloud_storage_server.server.WebServer;
+
 import javax.swing.*;
 import java.io.File;
+import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +18,7 @@ public class Main {
     public static CommandProcessor commandProcessor = new CommandProcessor(System.in);
     public static int bufferSize = 10240;
     public static int port = 80;
+    public static File loginData;
 
     public static void main(String[] arguments) {
         boolean force = false;
@@ -81,16 +85,31 @@ public class Main {
                 }
             }
         }
+
         if (System.console() == null && !force) {
+            Logger.log(Logger.level.WARNING, "Detected that program is not running in console, please try running with -force");
             JOptionPane.showMessageDialog(null, "This program currently only works on the command line");
             System.exit(1);
         }
 
         Runtime.getRuntime().addShutdownHook(new ShutdownHook());
+
+        loginData = new File(workDir.getPath()+File.separator+"accounts.json");
+
+        try {
+            loginData.createNewFile();
+        } catch (IOException exception) {
+            exception.printStackTrace();
+            Logger.log(Logger.level.CRITICAL, "Login data file could not be created, unable to continue");
+            System.exit(1);
+        }
+
         webServer = new WebServer(port);
+
         if (webServer.running) {
             Logger.log(Logger.level.NORMAL, "Server has started on port "+port);
         }
+
         commandProcessor.start();
         Logger.log(Logger.level.NORMAL, "Type \"help\" or \"?\" for help");
     }

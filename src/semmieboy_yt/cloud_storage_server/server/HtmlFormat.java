@@ -1,4 +1,6 @@
-package semmieboy_yt.cloud_storage_server;
+package semmieboy_yt.cloud_storage_server.server;
+
+import semmieboy_yt.cloud_storage_server.Main;
 
 import java.time.LocalDateTime;
 

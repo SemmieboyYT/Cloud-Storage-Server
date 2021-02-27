@@ -1,7 +1,9 @@
-package semmieboy_yt.cloud_storage_server;
+package semmieboy_yt.cloud_storage_server.server;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import semmieboy_yt.cloud_storage_server.Logger;
+import semmieboy_yt.cloud_storage_server.Main;
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -122,6 +124,8 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                                 sendBytes(httpExchange, "<!DOCTYPE html><html><head><title>404 not found</title></head><body><h1>Error 404: File not found</h1></body></html>".getBytes(), 404);
                             }
                             break;
+                        case "login":
+                            break;
                     }
                 } catch (IOException exception) {
                     exception.printStackTrace();
@@ -141,7 +145,6 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
         httpExchange.sendResponseHeaders(status, bytes.length);
         outputStream.write(bytes);
         outputStream.close();
-        //TODO: use sendData if more then buffer size
     }
 
     private void sendData(HttpExchange httpExchange, InputStream inputStream, int status) throws IOException {
@@ -153,7 +156,6 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
             int read = 0;
             byte[] size = Integer.toHexString(bufferSize).getBytes();
             byte[] terminator = new byte[] {13, 10};
-            //TODO: calculate the size more precise
             long bytesSend = (long)Math.ceil(length/(double)bufferSize)*(bufferSize+4+size.length)+5;
             ByteBuffer byteBuffer = ByteBuffer.allocate(size.length + 4 + bufferSize);
 
@@ -174,7 +176,6 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                 if (result != bufferSize) {
                     Logger.log(Logger.level.ERROR, "Expected "+bufferSize+", got "+result);
                     return;
-                    //TODO: make the client know why data transfer has cancelled
                 }
 
                 byteBuffer.put(size);
