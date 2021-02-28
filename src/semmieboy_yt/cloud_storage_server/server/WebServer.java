@@ -74,12 +74,7 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
             case "GET":
                 try {
                     String requestPath = requestURI.getPath();
-                    if (!requestPath.endsWith("/")) {
-                        httpExchange.getResponseHeaders().add("Location", requestPath+"/");
-                        sendBytes(httpExchange, "The URL must end with a /, please make a request with it".getBytes(), 302);
-                        return;
-                    }
-                    String[] args = requestPath.substring(1, requestPath.length() - 1).split("/");
+                    String[] args = requestPath.substring(1).split("/");
 
                     switch (args[0]) {
                         default:
@@ -94,7 +89,7 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                             }
                             break;
                         case "site":
-                            if (args.length > 1) {
+                            if (args.length > 1 && !args[1].isEmpty()) {
                                 httpExchange.getResponseHeaders().add("Location", args[1]);
                                 sendBytes(httpExchange, ("Redirecting to "+args[1]).getBytes(), 302);
                             } else {
@@ -102,7 +97,8 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                             }
                             break;
                         case "files":
-                            File requestedFile = new File(Main.workDir.getPath()+File.separator+requestPath.replace("/"+args[0], ""));
+                            File requestedFile = new File(Main.workDir.getPath()+File.separator+requestPath.replace("/"+args[0], "").replace("/", File.separator));
+                            Logger.log(Logger.level.DEBUG, requestPath.replace("/"+args[0], ""));
 
                             if (requestedFile.isFile()) {
                                 FileInputStream fileInputStream = new FileInputStream(requestedFile);
@@ -125,6 +121,8 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                             }
                             break;
                         case "login":
+                            break;
+                        case "register":
                             break;
                     }
                 } catch (IOException exception) {
