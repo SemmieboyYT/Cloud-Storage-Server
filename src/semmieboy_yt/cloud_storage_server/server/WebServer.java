@@ -132,8 +132,7 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                 break;
             case "POST":
                 break;
-            case "LOGIN":
-                Logger.log(Logger.level.DEBUG, "login");
+            case "PUT":
                 break;
         }
     }
