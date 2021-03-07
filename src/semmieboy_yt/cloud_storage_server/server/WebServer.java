@@ -81,9 +81,9 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                             sendBytes(httpExchange, HtmlFormat.format("<!DOCTYPE html><html><head><title>Cloud Storage</title></head><body><h1>"+requestURI+" %date% %time%</h1></body></html>").getBytes(), 200);
                             break;
                         case "favicon":
-                            File favicon = new File(Main.workDir.getPath()+File.separator+"/favicon.ico");
+                            File favicon = new File(Main.workDirPath+File.separator+"/favicon.ico");
                             if (favicon.exists()) {
-                                sendBytes(httpExchange, Files.readAllBytes(Paths.get(Main.workDir.toPath()+File.separator+"favicon.ico")), 200);
+                                sendBytes(httpExchange, Files.readAllBytes(Paths.get(Main.workDirPath+File.separator+"favicon.ico")), 200);
                             } else {
                                 sendBytes(httpExchange, "Not found".getBytes(), 404);
                             }
@@ -97,7 +97,7 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                             }
                             break;
                         case "files":
-                            File requestedFile = new File(Main.workDir.getPath()+File.separator+requestPath.replace("/"+args[0], "").replace("/", File.separator));
+                            File requestedFile = new File(Main.workDirPath+File.separator+requestPath.replace("/"+args[0], "").replace("/", File.separator));
                             Logger.log(Logger.level.DEBUG, requestPath.replace("/"+args[0], ""));
 
                             if (requestedFile.isFile()) {

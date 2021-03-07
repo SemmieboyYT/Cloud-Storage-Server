@@ -12,6 +12,7 @@ import java.util.List;
 public class Main {
     public static boolean debug = false;
     public static File workDir = new File(".");
+    public static String workDirPath;
     public static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("dd-MM-yyyy");
     public static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
     public static WebServer webServer;
@@ -19,6 +20,7 @@ public class Main {
     public static int bufferSize = 10240;
     public static int port = 80;
     public static File loginData;
+    public static File pages;
 
     public static void main(String[] arguments) {
         boolean force = false;
@@ -94,7 +96,11 @@ public class Main {
 
         Runtime.getRuntime().addShutdownHook(new ShutdownHook());
 
-        loginData = new File(workDir.getPath()+File.separator+"accounts.json");
+        workDirPath = workDir.getPath();
+
+        loginData = new File(workDirPath+File.separator+"accounts.json");
+        pages = new File(workDirPath+File.separator+"pages");
+
 
         try {
             loginData.createNewFile();
@@ -103,6 +109,16 @@ public class Main {
             Logger.log(Logger.level.CRITICAL, "Login data file could not be created, unable to continue");
             System.exit(1);
         }
+
+        try {
+            pages.createNewFile();
+        } catch (IOException exception) {
+            exception.printStackTrace();
+            Logger.log(Logger.level.CRITICAL, "The pages directory could not be created, unable to continue");
+            System.exit(1);
+        }
+
+        //Extract pages
 
         webServer = new WebServer(port);
 
