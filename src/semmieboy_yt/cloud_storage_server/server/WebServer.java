@@ -36,7 +36,7 @@ public class WebServer {
             return;
         }
         httpServer.createContext("/", new HttpHandler());
-        httpServer.setExecutor(Executors.newFixedThreadPool(10));
+        httpServer.setExecutor(Executors.newFixedThreadPool(100));
 
         httpServer.start();
         running = true;
@@ -98,7 +98,6 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
                             break;
                         case "files":
                             File requestedFile = new File(Main.workDirPath+File.separator+requestPath.replace("/"+args[0], "").replace("/", File.separator));
-                            Logger.log(Logger.level.DEBUG, requestPath.replace("/"+args[0], ""));
 
                             if (requestedFile.isFile()) {
                                 FileInputStream fileInputStream = new FileInputStream(requestedFile);
@@ -156,10 +155,21 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
             long bytesSend = (long)Math.ceil(length/(double)bufferSize)*(bufferSize+4+size.length)+5;
             ByteBuffer byteBuffer = ByteBuffer.allocate(size.length + 4 + bufferSize);
 
+            long amountOfBytes = 0;
+            long i = length;
+            while (i >= bufferSize) {
+                amountOfBytes += bufferSize + size.length + 4;
+                i -= bufferSize;
+                if (i == 0) break;
+            }
+            amountOfBytes += i + 5 + Integer.toHexString((int)i).getBytes().length;
+
             Logger.log(Logger.level.DEBUG, "Calculated amount of bytes that will get send: "+bytesSend);
+            Logger.log(Logger.level.DEBUG, "More precise version: "+amountOfBytes);
+            Logger.log(Logger.level.DEBUG, "Check: "+(bytesSend - amountOfBytes));
 
             httpExchange.getResponseHeaders().add("Transfer-Encoding", "chunked");
-            httpExchange.sendResponseHeaders(status, bytesSend);
+            httpExchange.sendResponseHeaders(status, amountOfBytes);
 
             while (read < length) {
                 byte[] bytes = new byte[bufferSize];
